@@ -236,151 +236,151 @@ grid on;
 
 end % Function
 
-function [] = lab5_ciezarek()
-% Lab 5 - ciężarek na sprężynie
+function [] = lab06()
+% Lab 6 - model drapieżnik-ofiara (Lotki-Volterry)
 %
-% Ciężarek o masie m na sprężynie (k) z tłumieniem (b), działa siła F(t):
+% Mamy dwa gatunki: x - ofiary (np. zające), y - drapieżniki (np. lisy).
 %
-%   m*x'' + b*x' + k*x = F(t)
+%   dx/dt = p1*x - p2*x*y
+%   dy/dt = p3*x*y - p4*y
 %
-% m*x'' - masa razy przyspieszenie
-% b*x'  - tłumienie (opór proporcjonalny do prędkości)
-% k*x   - siła sprężyny
-
-% Definiujemy stałe
-m = 0.5; % [kg]
-k = 1; % [N/m]
-b = 0.1; % [N * s / m]
-F0 = 0.1; % [N]
-
-
+% - p1*x   : ofiary się rozmnażają (im więcej ich jest, tym szybciej)
+% - p2*x*y : drapieżniki zjadają ofiary (im częściej się spotykają, tym więcej)
+% - p3*x*y : drapieżniki rozmnażają się dzięki zjedzonym ofiarom
+% - p4*y   : drapieżniki umierają, jak nie mają co jeść
+%
+% Co się dzieje: dużo ofiar -> drapieżniki mają jedzenie i ich przybywa ->
+% zjadają ofiary i ofiar ubywa -> drapieżniki nie mają co jeść i ich ubywa
+% -> ofiary znowu się rozmnażają ... i tak w kółko. Wychodzą drgania,
+% drapieżniki są trochę "spóźnione" względem ofiar.
+%
+% Punkt równowagi (nic się nie zmienia): x = p4/p3 = 270, y = p1/p2 = 80.
+% Zaczynamy od x = 100, y = 60, więc układ krąży wokół tego punktu.
+% Okres drgań wychodzi ok 0.53, więc w t od 0 do 1 widać prawie 2 okresy.
+%
+% Zapisujemy oba równania razem jako wektor z = [x; y]:
+%   z' = f(t, z),  gdzie z(1) = x, z(2) = y
+ 
+% Definiujemy parametry
+p1 = 12;
+p2 = 0.15;
+p3 = 0.05;
+p4 = 13.5;
+ 
+% Warunki początkowe
+x0 = 100;
+y0 = 60;
+z0 = [x0; y0];
+ 
+tspan = [0, 1]; % Przebieg czasu
+ 
+% Prawa strona równań jako funkcja anonimowa.
+% Zwraca wektor kolumnowy [x'; y'].
+f = @(t, z)[p1 * z(1) - p2 * z(1) * z(2); p3 * z(1) * z(2) - p4 * z(2)];
+ 
+ 
 % Zadanie 1
-% F(t) = F0*(1 - exp(-0.2*t)) dla t >= 0, czyli siła rośnie od 0 do F0.
-% Rozwiązujemy Fourierem. Fourier zamienia pochodne na mnożenie przez i*w:
-%   x' -> i*w*X(w),   x'' -> -w^2*X(w)
-% więc dostajemy zwykłe równanie:
-%   (k - m*w^2 + i*b*w) * X(w) = F(w)
-% isolate() wyciąga X(w), ifourier() wraca do x(t).
-% Na wykresie: ciężarek drga, drgania gasną i ustala się w x = F0/k = 0.1 m.
-syms x(t) F(t) w t % Definiujemy zmienne symboliczne
-tspan = [0, 60];
-
-dx = diff(x, t); % Definiujemy pochodne 1. i 2. rzędu
-d2x = diff(x, t, 2);
-
-% Funkcja przełożenia siły
-F(t) = F0 * (1 - exp((-1) * 0.2 * t)) * heaviside(t);
-
-eqn = m * d2x + b * dx + k * x == F(t); % Równanie różniczkowe
-
-eqnF = fourier(lhs(eqn)) == fourier(rhs(eqn));
-eqnF = isolate(eqnF, fourier(x(t), t, w));
-
-yF = ifourier(rhs(eqnF));
-
+% Rozwiązujemy wbudowaną funkcją ode45 (metoda Rungego-Kutty rzędu 4/5,
+% sama dobiera krok). To traktujemy jako wynik "dokładny" do porównań.
+% options: RelTol i AbsTol to dopuszczalny błąd. Dajemy bardzo mały
+% (1e-12), żeby wynik był jak najdokładniejszy.
+% ode45 zwraca: t - chwile czasu (sama je wybiera, nie są równo co 0.01),
+%               z - macierz, kolumna 1 to x, kolumna 2 to y.
+options = odeset('RelTol', 1e-12, 'AbsTol', 1e-12);
+ 
+[t, z] = ode45(f, tspan, z0, options);
+ 
+x = z(:, 1);
+y = z(:, 2);
+ 
 figure(1);
 clf;
 hold on;
-fplot(yF, tspan);
-title("Zad 1 - Ruch ciężarka x(t)");
-xlabel("t, [s]");
-ylabel("x, [m]");
 grid on;
-
-
+plot(t, x, 'r--', 'DisplayName', 'ode45');
+legend;
+title('Liczebność ofiar x(t)');
+xlabel('t, [s]');
+ylabel('n, populacja');
+ 
+figure(2);
+clf;
+hold on;
+grid on;
+plot(t, y, 'r--', 'DisplayName', 'ode45');
+legend;
+title('Liczebność drapieżników y(t)');
+xlabel('t, [s]');
+ylabel('n, populacja');
+ 
+% Wynik: ofiary rosną od 100 do ok 587, drapieżniki od 60 do ok 181.
+% Maksimum drapieżników (t = ok 0.37) jest PO maksimum ofiar (t = ok 0.28),
+% bo drapieżniki najpierw muszą się najeść.
+ 
+ 
 % Zadanie 2
-% Z zadania 1: X(w) = F(w) / (k - m*w^2 + i*b*w)
-% Moduł |a + i*c| = sqrt(a^2 + c^2), więc charakterystyka amplitudowa:
-%   A(w) = 1 / sqrt((k - m*w^2)^2 + (b*w)^2)
-% Mówi ile razy drgania są większe niż siła przy częstości w.
-% - w = 0: A = 1/k = 1
-% - w = sqrt(k/m) = 1.41: rezonans, A = ok 7.07
-% - duże w: A -> 0
-syms A(w)
-wspan = [0, 10];
-A(w) = 1 / sqrt((k - m * w^2)^2 + (b * w)^2);
-
-figure(2); % Szkicujemy wykres A(w)
-clf;
-fplot(A, wspan);
-title("Zad 2 - Charakterystyka amplitudowa A(w)");
-xlabel("w, [rad/s]");
-ylabel("A");
-grid on;
-
-
+% To samo, ale jawną metodą Eulera ze stałym krokiem h = 0.01.
+%   z(i) = z(i-1) + h * f(t(i-1), z(i-1))
+% czyli: nowa wartość = stara + krok * pochodna w starym punkcie.
+%
+% Z to macierz N x 2: wiersz i to [x, y] w chwili t(i).
+% f chce wektor KOLUMNOWY i zwraca kolumnowy, a w Z trzymamy WIERSZE,
+% dlatego są apostrofy (transpozycja): Z(i-1, :)' -> kolumna, f(...)' -> wiersz.
+h = 0.01;
+t = 0:h:1;
+N = length(t);
+Z = zeros(N, 2);
+Z(1, :) = z0;
+ 
+for i = 2:N
+    Z(i, :) = Z(i-1, :) + h * f(t(i-1), Z(i-1, :)')';
+end % for
+ 
+X = Z(:, 1);
+Y = Z(:, 2);
+ 
+figure(1);
+plot(t, X, 'b', 'DisplayName', 'Euler');
+ 
+figure(2);
+plot(t, Y, 'b', 'DisplayName', 'Euler');
+ 
+% Wynik: Euler bardzo się rozjeżdża z ode45. Drgania zamiast się
+% powtarzać ROSNĄ (ofiary do ok 977 zamiast 587, drapieżniki do ok 354
+% zamiast 181). Euler idzie po stycznej, a rozwiązanie jest "zakrzywione"
+% (krąży), więc w każdym kroku trochę wypada na zewnątrz i błąd się sumuje.
+% Mniejsze h by pomogło, ale Euler jest tylko rzędu 1 (błąd ~ h).
+ 
+ 
 % Zadanie 3
-% Siła okresowa F = F0*cos(w0*t) dla w0 = 0.1, 1.4, 3.2 (z kodu kolegi).
-% 0.1 - poniżej rezonansu, 1.4 - prawie rezonans, 3.2 - powyżej.
-% Po ustaleniu amplituda = F0*A(w0): ok 0.1 m, 0.71 m, 0.024 m.
-% Ciężarek na początku stoi: x(0) = 0, x'(0) = 0.
-% Używam dsolve zamiast Fouriera, bo Fourier z cos daje delty Diraca
-% i ifourier często sobie z tym nie radzi.
-w0 = [0.1 1.4 3.2];
-figure(3);
-clf;
-for i = 1:3
-    fc = F0 * cos(w0(i) * t);
-    eqn = m * d2x + b * dx + k * x == fc;
-    xc = dsolve(eqn, [x(0) == 0, dx(0) == 0]);
-    subplot(3, 1, i);
-    fplot(xc, tspan);
-    title("Zad 3 - w0 = " + w0(i));
-    xlabel("t, [s]");
-    ylabel("x, [m]");
-    grid on;
-end
-
-
-% Zadanie 4
-% Zadanie 1 numerycznie metodą Eulera i porównanie z Fourierem.
-% Euler jest dla 1. rzędu, więc rozbijamy na dwa równania (v = x'):
-%   x' = v
-%   v' = (F - b*v - k*x) / m
-% Euler: x(p+1) = x(p) + dt*v(p)
-%        v(p+1) = v(p) + dt*(F(p) - b*v(p) - k*x(p))/m
-% Przy dt = 0.01 pokrywa się z Fourierem. Przy dt >= 0.1 drgania
-% zamiast gasnąć rosną (Euler jest niestabilny).
-dt = 0.01;
-T = 0:dt:60;
-N = length(T);
-
-Fn = F0 * (1 - exp(-0.2 * T));
-xn = zeros(1, N);
-vn = zeros(1, N);
-
-for p = 1:N-1
-    xn(p+1) = xn(p) + dt*vn(p);
-    vn(p+1) = vn(p) + dt*(Fn(p) - b*vn(p) - k*xn(p))/m;
-end
-
-figure(4);
-clf;
-hold on;
-plot(T, xn);
-fplot(yF, tspan, '--');
-title("Zad 4 - Euler vs Fourier");
-xlabel("t, [s]");
-ylabel("x, [m]");
-legend("Euler", "Fourier");
-grid on;
-
-
-% Zadanie 5
-% Wpływ tłumienia b na A(w). Im mniejsze b tym wyższy i węższy pik
-% rezonansowy (w rezonansie A = 1/(b*w), więc zależy od b).
-bb = [0.05 0.1 0.2 0.5];
-figure(5);
-clf;
-hold on;
-for i = 1:4
-    Ab(w) = 1 / sqrt((k - m * w^2)^2 + (bb(i) * w)^2);
-    fplot(Ab, wspan);
-end
-title("Zad 5 - A(w) dla różnych b");
-xlabel("w, [rad/s]");
-ylabel("A");
-legend("b = 0.05", "b = 0.1", "b = 0.2", "b = 0.5");
-grid on;
-
+% Zmodyfikowana metoda Eulera (metoda punktu środkowego):
+%   1) robimy pół kroku zwykłym Eulerem:
+%        z_pol = z(i-1) + (h/2) * f(t(i-1), z(i-1))
+%   2) liczymy pochodną w tym środkowym punkcie i dopiero nią robimy
+%      cały krok:
+%        z(i) = z(i-1) + h * f(t(i-1) + h/2, z_pol)
+% Pochodna ze środka kroku lepiej pasuje do całego kroku niż ta z początku,
+% więc metoda jest rzędu 2 (błąd ~ h^2) - dużo dokładniejsza.
+Z_ = zeros(N, 2);
+Z_(1, :) = z0;
+ 
+for i = 2:N
+    z_pol = Z_(i-1, :) + 0.5 * h * f(t(i-1), Z_(i-1, :)')'; % pół kroku
+    Z_(i, :) = Z_(i-1, :) + h * f(t(i-1) + 0.5 * h, z_pol')'; % cały krok
+end % for
+ 
+X_ = Z_(:, 1);
+Y_ = Z_(:, 2);
+ 
+figure(1);
+plot(t, X_, 'm-.', 'DisplayName', 'Euler zmodyfikowany');
+ 
+figure(2);
+plot(t, Y_, 'm-.', 'DisplayName', 'Euler zmodyfikowany');
+ 
+% Wynik: prawie pokrywa się z ode45 (max ofiar ok 589 zamiast 587,
+% największy błąd ok 6 dla ofiar i ok 2 dla drapieżników, a w zwykłym
+% Eulerze ponad 700 i 200). Przy tym samym kroku h jest dużo lepszy.
+ 
 end % Function
+ 
